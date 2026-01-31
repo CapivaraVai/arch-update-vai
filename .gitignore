@@ -1,0 +1,9 @@
+# Ignorar logs
+*.log
+
+# Arquivos temporários
+*.tmp
+*.swp
+
+# Arquivos de backup
+*~
