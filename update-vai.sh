@@ -2,12 +2,12 @@
 # ============================================================
 # update-vai.sh - Atualizador Arch Linux (menu completo, relatório detalhado)
 # Autor: Diego Ernani (CapivaraVai)
-# Versão: 0.5.6
+# Versão: 0.6.0
 # ============================================================
 
 set -Eeuo pipefail
 
-VERSION="0.5.6"
+VERSION="0.6.0"
 AUTHOR="Diego Ernani (CapivaraVai)"
 
 LOGDIR="$HOME/arch-update-script-vai/logs"
