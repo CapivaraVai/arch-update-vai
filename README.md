@@ -37,6 +37,7 @@ Além disso, gera um relatório detalhado com:
 
 ---
 
+```bash
 ## 📊 Exemplo de saída
 
 📊 RELATÓRIO
@@ -62,7 +63,7 @@ pip (outdated detectados): 13
 
 ✅ Reinício: não parece necessário (heurística).
 ⚠ Concluído com avisos.
-
+```
 
 
 ---
