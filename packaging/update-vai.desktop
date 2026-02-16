@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Arch Update Vai
+Comment=Atualizador do Arch Linux
+Exec=konsole -e update-vai
+Icon=update-vai
+Terminal=false
+Categories=System;Settings;

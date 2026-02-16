@@ -1,0 +1,6 @@
+[Unit]
+Description=Arch Update Vai (non-interactive)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/update-vai --auto --yes
