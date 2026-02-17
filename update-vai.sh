@@ -1,18 +1,24 @@
 #!/bin/bash
-# ============================================================
+# =============================================================================
 # update-vai.sh - Atualizador Arch Linux (menu completo, relatório detalhado)
 # Autor: Diego Ernani (CapivaraVai)
-# Versão: 0.6.2
-# ============================================================
+# Versão: 0.6.3
+# =============================================================================
 
 set -Eeuo pipefail
 
-VERSION="0.6.2"
+trap 'rc=$?; error "Erro inesperado (linha $LINENO): $BASH_COMMAND (exit=$rc)"; exit $rc' ERR
+
+VERSION="0.6.3"
 AUTHOR="Diego Ernani (CapivaraVai)"
 
-LOGDIR="$HOME/arch-update-script-vai/logs"
+LOGDIR="${XDG_STATE_HOME:-$HOME/.local/state}/arch-update-vai/logs"
 mkdir -p "$LOGDIR"
+ls -1t "$LOGDIR"/update-vai-*.log 2>/dev/null | tail -n +31 | xargs -r rm -f --
 LOGFILE="$LOGDIR/update-vai-$(date '+%Y%m%d-%H%M%S').log"
+START_EPOCH=$(date +%s)
+
+
 
 ASSUME_YES=false
 AUTO=false
@@ -53,11 +59,18 @@ tty_read() { # tty_read "Prompt" var
 # -------------------------
 # Log e mensagens
 # -------------------------
-_strip_ansi() { sed -r 's/\x1B\[[0-9;]*[a-zA-Z]//g'; }
+_strip_ansi() { sed -E 's/\x1B\[[0-9;]*[[:alpha:]]//g'; }
+
+timestamp() {
+  date "+%Y-%m-%d %H:%M:%S"
+}
 
 _log_plain() {
-  printf "%s\n" "$*" | _strip_ansi >> "$LOGFILE" 2>/dev/null || true
+  mkdir -p "$LOGDIR" 2>/dev/null || true
+  printf "[%s] %s\n" "$(timestamp)" "$*" >> "$LOGFILE" 2>/dev/null || true
 }
+
+_log_plain "==== update-vai v$VERSION | $(date) | host=$(hostname) | kernel=$(uname -r) ===="
 
 _print() { printf "%b\n" "$*"; }
 
@@ -251,21 +264,36 @@ show_report() {
   else
     _print "\033[1;32m🎉 Concluído sem problemas!\033[0m"
   fi
+
+  END_EPOCH=$(date +%s)
+  DURATION=$((END_EPOCH - START_EPOCH))
+  _log_plain "Tempo total: ${DURATION}s"
 }
 
 # -------------------------
 # Sudo e segurança
 # -------------------------
+SUDO_KEEPALIVE_PID=""
+
 ensure_sudo() {
   if ! sudo -v; then
     error "Não foi possível obter sudo."
     return 1
   fi
-  ( while true; do sudo -n true; sleep 60; done ) &
+
+  # já está rodando? não cria outro
+  if [[ -n "${SUDO_KEEPALIVE_PID:-}" ]] && kill -0 "$SUDO_KEEPALIVE_PID" 2>/dev/null; then
+    return 0
+  fi
+
+  ( while true; do sudo -n true; sleep 60; done ) >/dev/null 2>&1 &
   SUDO_KEEPALIVE_PID=$!
-  trap 'kill ${SUDO_KEEPALIVE_PID:-0} 2>/dev/null || true' EXIT
+
+  # mata no final do script
+  trap '[[ -n "${SUDO_KEEPALIVE_PID:-}" ]] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true' EXIT
   return 0
 }
+
 
 check_pacman_lock() { [[ -f /var/lib/pacman/db.lck ]]; }
 
@@ -278,6 +306,7 @@ run_step() {
   local timeout_d="$1"; shift
 
   info "➡️  $name"
+  _log_plain "COMMAND: $*"
   local start end duration status
   start=$(date +%s)
 
@@ -291,12 +320,13 @@ run_step() {
   fi
 
   if [[ "$timeout_d" != "0" ]] && command -v timeout >/dev/null 2>&1; then
-    timeout "$timeout_d" "$@" >> "$LOGFILE" 2>&1
-    status=$?
+    timeout "$timeout_d" "$@" 2>&1 | _strip_ansi >> "$LOGFILE"
+    status=${PIPESTATUS[0]}
   else
-    "$@" >> "$LOGFILE" 2>&1
-    status=$?
+    "$@" 2>&1 | _strip_ansi >> "$LOGFILE"
+    status=${PIPESTATUS[0]}
   fi
+
 
   [[ -n "$warn_pid" ]] && kill "$warn_pid" 2>/dev/null || true
 
