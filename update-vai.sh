@@ -2,19 +2,20 @@
 # =============================================================================
 # update-vai.sh - Atualizador Arch Linux (menu completo, relatório detalhado)
 # Autor: Diego Ernani (CapivaraVai)
-# Versão: 0.6.3
+# Versão: 0.7.0
 # =============================================================================
 
 set -Eeuo pipefail
 
-trap 'rc=$?; error "Erro inesperado (linha $LINENO): $BASH_COMMAND (exit=$rc)"; exit $rc' ERR
+_early_error() { echo "[ERROR] $*" >&2; }
+trap 'rc=$?; _early_error "Erro inesperado (linha $LINENO): $BASH_COMMAND (exit=$rc)"; exit $rc' ERR
 
-VERSION="0.6.3"
+VERSION="0.7.0"
 AUTHOR="Diego Ernani (CapivaraVai)"
 
 LOGDIR="${XDG_STATE_HOME:-$HOME/.local/state}/arch-update-vai/logs"
 mkdir -p "$LOGDIR"
-ls -1t "$LOGDIR"/update-vai-*.log 2>/dev/null | tail -n +31 | xargs -r rm -f --
+( ls -1t "$LOGDIR"/update-vai-*.log 2>/dev/null | tail -n +31 | xargs -r rm -f -- ) || true
 LOGFILE="$LOGDIR/update-vai-$(date '+%Y%m%d-%H%M%S').log"
 START_EPOCH=$(date +%s)
 
@@ -59,7 +60,8 @@ tty_read() { # tty_read "Prompt" var
 # -------------------------
 # Log e mensagens
 # -------------------------
-_strip_ansi() { sed -E 's/\x1B\[[0-9;]*[[:alpha:]]//g'; }
+# (rotação de logs já foi feita no início do script)
+
 
 timestamp() {
   date "+%Y-%m-%d %H:%M:%S"
@@ -290,7 +292,11 @@ ensure_sudo() {
   SUDO_KEEPALIVE_PID=$!
 
   # mata no final do script
-  trap '[[ -n "${SUDO_KEEPALIVE_PID:-}" ]] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true' EXIT
+  cleanup() {
+    [[ -n "${SUDO_KEEPALIVE_PID:-}" ]] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+  }
+  trap cleanup EXIT
+
   return 0
 }
 
@@ -304,6 +310,8 @@ run_step() {
   local name="$1"; shift
   local warn_after="$1"; shift
   local timeout_d="$1"; shift
+
+  _strip_ansi() { sed -E 's/\x1B\[[0-9;]*[[:alpha:]]//g'; }
 
   info "➡️  $name"
   _log_plain "COMMAND: $*"
@@ -579,20 +587,23 @@ update_icons() {
 
 remove_orphans_pacman() {
   ensure_sudo || return 1
-  local orf
-  orf=$(pacman -Qdtq 2>/dev/null || true)
-  [[ -n "$orf" ]] || { info "Nenhum órfão encontrado (pacman)."; return 0; }
+
+  local -a orphans=()
+  mapfile -t orphans < <(pacman -Qdtq 2>/dev/null || true)
+  ((${#orphans[@]})) || { info "Nenhum órfão encontrado (pacman)."; return 0; }
 
   if [[ "$ASSUME_YES" == true ]]; then
-    run_step "Remover órfãos (pacman)" 5 "30m" sudo pacman -Rns $orf --noconfirm || true
+    run_step "Remover órfãos (pacman) [itens: ${#orphans[@]}]" 5 "30m" \
+      sudo pacman -Rns --noconfirm "${orphans[@]}" || true
     success "Órfãos removidos."
     return 0
   fi
 
   local answer=""
-  tty_read "Remover pacotes órfãos? [S/n]: " answer
+  tty_read "Remover pacotes órfãos (${#orphans[@]})? [S/n]: " answer
   if [[ "$answer" =~ ^[SsYy]$ || -z "$answer" ]]; then
-    run_step "Remover órfãos (pacman)" 5 "30m" sudo pacman -Rns $orf --noconfirm || true
+    run_step "Remover órfãos (pacman) [itens: ${#orphans[@]}]" 5 "30m" \
+      sudo pacman -Rns --noconfirm "${orphans[@]}" || true
     success "Órfãos removidos."
   else
     warn "Remoção de órfãos cancelada."
