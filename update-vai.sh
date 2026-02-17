@@ -2,12 +2,12 @@
 # ============================================================
 # update-vai.sh - Atualizador Arch Linux (menu completo, relatório detalhado)
 # Autor: Diego Ernani (CapivaraVai)
-# Versão: 0.6.0
+# Versão: 0.6.2
 # ============================================================
 
 set -Eeuo pipefail
 
-VERSION="0.6.0"
+VERSION="0.6.2"
 AUTHOR="Diego Ernani (CapivaraVai)"
 
 LOGDIR="$HOME/arch-update-script-vai/logs"
@@ -149,7 +149,7 @@ _check_reboot_from_pkglist() {
   done
 }
 
-# Heurística extra: kernel em uso x kernel instalado
+# Kernel em uso x kernel instalado
 _check_kernel_mismatch() {
   local running installed running_norm installed_norm
 
@@ -233,7 +233,7 @@ show_report() {
     done
   else
     echo
-    echo "✅ Reinício: não parece necessário (heurística)."
+    echo "✅ Reinício: não parece necessário."
   fi
 
   _log_plain "RELATORIO: success=$SUCCESS_COUNT warnings=$WARNING_COUNT errors=$ERROR_COUNT duration=${DURATION}s"
@@ -374,7 +374,7 @@ _count_fwupd_updates() {
   command -v fwupdmgr >/dev/null 2>&1 || { echo 0; return 0; }
   local out
   out="$(fwupdmgr get-updates 2>/dev/null || true)"
-  # heurística: conta bullets "•"
+  # Conta bullets "•"
   printf "%s\n" "$out" | grep -c "•" 2>/dev/null || echo 0
 }
 
